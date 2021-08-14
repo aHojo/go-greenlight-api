@@ -31,7 +31,7 @@ func main() {
 	flag.IntVar(&cfg.port, "port",4000, "The port our api will listen on")
 	flag.StringVar(&cfg.env, "env", "dev", "The environment our code was built with.")
 	flag.Parse()
-	fmt.Printf("%v", cfg)
+
 	// Initialize a new logger which writes messages to the standard stream, prefixed
 	// with the current date and time
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)

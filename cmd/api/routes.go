@@ -9,6 +9,11 @@ func (app *application)routes() *httprouter.Router {
 	// Initialize httprouter
 	router := httprouter.New()
 
+	// Conver the notFoundResponse() helpper to a http.Handler and set it as 
+	// the custom error handler for 404
+	router.NotFound = http.HandlerFunc(app.notFoundResponse)
+	router.MethodNotAllowed = http.HandlerFunc(app.methodNotAllowedResponse)
+
 	// Register our routes
 	// URL patterns and handler functions
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthCheckHandler)
