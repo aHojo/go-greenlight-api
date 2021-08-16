@@ -1,11 +1,23 @@
 package data
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/ahojo/greenlight/internal/validator"
 )
 
+// Models wraps all of our database models
+type Models struct {
+	Movies MovieModel
+}
+
+// Creates a Models that holds all of our database models. 
+func NewModels(db *sql.DB) Models {
+	return Models{
+		Movies: MovieModel{DB: db},
+	}
+}
 // Movie data that we will reutrn as JSON
 // The props all need to be exported
 type Movie struct {
@@ -37,3 +49,28 @@ func ValidateMovie(v *validator.Validator, movie *Movie) {
 	v.Check(movie.Year >= 1888, "year", "must be greater than 1888")
 	v.Check(movie.Year <= int32(time.Now().Year()), "year", "must not be in the future")
 }
+
+// MovieModel wraps our db connection
+type MovieModel struct {
+	DB *sql.DB
+}
+
+// Insert inserts a new movie record
+func (m *MovieModel) Insert(movie *Movie) error {
+	return nil 
+}
+// Get gets a specific movie from our database
+func (m *MovieModel) Get(movie *Movie) error {
+	return nil 
+}
+
+// Update updates a specific movie from our database
+func (m *MovieModel) Update(movie *Movie) error {
+	return nil 
+}
+
+// Delete
+func (m *MovieModel) Delete(id int64) error {
+	return nil 
+}
+

@@ -11,7 +11,8 @@ import (
 	"time"
 
 	// Import the pq driver. It will register itself with the db/sql pacakage.
-	_ "github.com/lib/pq" 
+	"github.com/ahojo/greenlight/internal/data"
+	_ "github.com/lib/pq"
 )
 
 // The version of our api
@@ -22,10 +23,10 @@ type config struct {
 	port int
 	env  string
 	db   struct {
-		dsn string
+		dsn          string
 		maxOpenConns int
 		maxIdleConns int
-		maxIdleTime string
+		maxIdleTime  string
 	}
 }
 
@@ -34,6 +35,7 @@ type config struct {
 type application struct {
 	config config
 	logger *log.Logger
+	models data.Models
 }
 
 func main() {
@@ -47,18 +49,12 @@ func main() {
 	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("GREENLIGHT_DB_DSN"), "PostgresSQL DSN")
 	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgresSQL max open connections")
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idleconns", 25, "PostgresSQL max idle connections")
-	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time","15m", "PostgresSQL max connection idle time")
+	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", "15m", "PostgresSQL max connection idle time")
 	flag.Parse()
 
 	// Initialize a new logger which writes messages to the standard stream, prefixed
 	// with the current date and time
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
-
-	// Initialize our application
-	app := &application{
-		config: cfg,
-		logger: logger,
-	}
 
 	db, err := openDB(cfg)
 	if err != nil {
@@ -66,6 +62,12 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize our application
+	app := &application{
+		config: cfg,
+		logger: logger,
+		models: data.NewModels(db),
+	}
 	// Declare a HTTP server with some sensible timeout settings
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", app.config.port),
@@ -90,8 +92,8 @@ func openDB(cfg config) (*sql.DB, error) {
 	// Set the maximum number of open (in use + idle) connections in the pool.
 	// <= 0 means unlimited
 	db.SetMaxOpenConns(cfg.db.maxOpenConns)
-	
-	// Set the maximum number of idle connections 
+
+	// Set the maximum number of idle connections
 	// <= 0 means unlimited
 	db.SetMaxIdleConns(cfg.db.maxIdleConns)
 
