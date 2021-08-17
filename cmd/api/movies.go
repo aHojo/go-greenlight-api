@@ -75,9 +75,7 @@ func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request
 	var input struct {
 		Title   string
 		Genres  []string
-		Page    int
-		PagSize int
-		Sort    string
+		Filters 	data.Filters
 	}
 
 	// Initialize a validator
@@ -94,20 +92,32 @@ func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request
 	// Get the page and page_size query string values as integers. Notice that we set
 	// the default page value to 1 and default page_size to 20, and that we pass the
 	// validator instance as the final argument here
-	input.Page = app.readInt(qs, "page", 1, v)
-	input.PagSize = app.readInt(qs, "page_size", 20, v)
+	input.Filters.Page = app.readInt(qs, "page", 1, v)
+	input.Filters.PageSize = app.readInt(qs, "page_size", 20, v)
 
-	// Extract the sort query string value, falling back to "id" if it is not provided
-	input.Sort = app.readString(qs, "sort", "id")
-
+	// Extract the sort query  string value, falling back to "id" if it is not provided
+	input.Filters.Sort = app.readString(qs, "sort", "id")
+	// list of things we are allowed to sort on.
+	input.Filters.SortSafelist = []string{
+		"id",
+		"title",
+		"year",
+		"runtime",
+		"-id",
+		"-title",
+		"-year",
+		"-runtime",
+	}
+	
+	// Execute the vailadtion checks on the Filters struct
 	// Check the validator
-	if !v.Valid() {
+	if data.ValidateFilters(v, input.Filters); !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
 	// Dump the contents of the input struct in a http resposne
-	fmt.Fprintf(w, "%v\n", input)
+	fmt.Fprintf(w, "%+v\n", input)
 }
 
 // showMovieHandler for "GET /v1/movies/:id"
