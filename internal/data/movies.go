@@ -132,7 +132,7 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 }
 
 // GetAll returns a slice of Movies. 
-func (m *MovieModel) GetAll(title string, gernres []string, filters Filters)([]*Movie, error) {
+func (m *MovieModel) GetAll(title string, gernres []string, filters Filters)([]*Movie, Metadata, error) {
 	// Sql Query
 	// query := `
 	// SELECT id, created_at, title, year, runtime, genres, version
@@ -193,8 +193,9 @@ ORDER BY id
 	// Add an ORDER BY clause and interpolate the sort column and direction. Importantly
   // notice that we also include a secondary sort on the movie ID to ensure a
   // consistent ordering.
+	// Added the window function to count the number of (filtered) records
 	query := fmt.Sprintf(`
-	SELECT id, created_at, title, year, runtime, genres, version
+	SELECT COUNT(*) OVER(),id, created_at, title, year, runtime, genres, version
 	FROM movies
 	WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
 	AND (genres @> $2 OR $2 = '{}')     
@@ -215,12 +216,13 @@ ORDER BY id
 	// Title and genres have the default params.
 	rows, err := m.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 
 	// Make sure to close the rows stream return
 	defer rows.Close()
 
+	totalRecords := 0
 	// data structure to hold all of our movies
 	var movies = []*Movie{}
 
@@ -231,6 +233,7 @@ ORDER BY id
 		// Scan the values from the row into the Movie
 		// Note: pq.Array() again
 		err := rows.Scan(
+			&totalRecords, // Scan the count from the window function into total records
 			&movie.ID,
 			&movie.CreatedAt,
 			&movie.Title,
@@ -240,17 +243,20 @@ ORDER BY id
 			&movie.Version,
 		)
 		if err != nil {
-			return nil, err
+			return nil, Metadata{}, err
 		}
 		movies = append(movies, &movie)
 	}
 
 	// When the rows.Next() finishes, if there is an error it's in rows.Err()
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 
-	return movies, nil
+	// Generate a Metadata struct, passing in the total record count and pagination params from the client
+	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
+
+	return movies, metadata, nil
 
 } 
 
