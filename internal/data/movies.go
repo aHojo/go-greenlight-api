@@ -181,6 +181,14 @@ func (m *MovieModel) GetAll(title string, gernres []string, filters Filters)([]*
 	ORDER BY id
 	`
 
+	/* could have also used ILIKE
+	SELECT id, created_at, title, year, runtime, genres, version
+FROM movies
+WHERE (title ILIKE $1 OR $1 = '') 
+AND (genres @> $2 OR $2 = '{}')     
+ORDER BY id
+*/ 
+
 	// 3 second context timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
 	defer cancel()

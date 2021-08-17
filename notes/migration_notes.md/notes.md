@@ -68,3 +68,15 @@ total 0
 
 ## Apply the migrations 
 `migrate -path=./migrations -database=$GREENLIGHT_DB_DSN up`
+
+## Add indexes to our database
+```sql
+➜  go-greenlight-api git:(FilterSortPagination) ✗ export GREENLIGHT_DB_DSN='postgres://username:password@localhost/greenlight?sslmode=disable'
+
+➜  go-greenlight-api git:(FilterSortPagination) migrate create -seq -ext .sql -dir ./migrations add_movies_indexes
+/home/ahojo/development/go/src/go-greenlight-api/migrations/000003_add_movies_indexes.up.sql
+/home/ahojo/development/go/src/go-greenlight-api/migrations/000003_add_movies_indexes.down.sql
+
+➜  go-greenlight-api git:(FilterSortPagination) ✗ migrate -path ./migrations -database $GREENLIGHT_DB_DSN up
+3/u add_movies_indexes (16.782845ms)
+```
