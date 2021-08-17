@@ -133,18 +133,40 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 // GetAll returns a slice of Movies. 
 func (m *MovieModel) GetAll(title string, gernres []string, filters Filters)([]*Movie, error) {
 	// Sql Query
+	// query := `
+	// SELECT id, created_at, title, year, runtime, genres, version
+	// FROM movies
+	// ORDER BY id
+	// `
+
+	/*
+			This SQL query is designed so that each of the filters behaves like it is ‘optional’. For
+		example, the condition (LOWER(title) = LOWER($1) OR $1 = '')  will evaluate as true if
+		the placeholder parameter $1 is a case-insensitive match for the movie title or the
+		placeholder parameter equals ''. So this filter condition will essentially be ‘skipped’ when
+		movie title being searched for is the empty string "".
+
+			The (genres @> $2 OR $2 = '{}')  condition works in the same way. The  @> symbol is the
+		‘contains’ operator for PostgreSQL arrays, and this condition will return true if all values in
+		the placeholder parameter $2 are contained in the database  genres field or the placeholder
+		parameter contains an empty array.
+
+		https://www.postgresql.org/docs/9.6/functions-array.html
+	*/
 	query := `
 	SELECT id, created_at, title, year, runtime, genres, version
 	FROM movies
-	ORDER BY id
-	`
+	WHERE (LOWER(title) = LOWER($1) OR $1 = '') 
+	AND (genres @> $2 OR $2 = '{}')     
+	ORDER BY id`
 
 	// 3 second context timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
 	defer cancel()
 
 	// Get back the data from the database. Cancels if takes too long
-	rows, err := m.DB.QueryContext(ctx, query)
+	// Title and genres have the default params.
+	rows, err := m.DB.QueryContext(ctx, query, title, pq.Array(gernres))
 	if err != nil {
 		return nil, err
 	}
