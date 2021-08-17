@@ -153,12 +153,33 @@ func (m *MovieModel) GetAll(title string, gernres []string, filters Filters)([]*
 
 		https://www.postgresql.org/docs/9.6/functions-array.html
 	*/
+		// query := `
+	// SELECT id, created_at, title, year, runtime, genres, version
+	// FROM movies
+	// WHERE (LOWER(title) = LOWER($1) OR $1 = '') 
+	// AND (genres @> $2 OR $2 = '{}')     
+	// ORDER BY id`
+
+	/* Add FULL TEXT SEARCH PostgreSQL feature
+	The to_tsvector('simple', title) function takes a movie title and splits it into lexemes.
+	We specify the simple configuration, which means that the lexemes are just lowercase
+	versions of the words in the title
+
+	The plainto_tsquery('simple', $1) function takes a search value and turns it into a
+	formatted query term.
+
+	It normalizes the search value (again using the simple configuration), strips any special characters, and
+	inserts the and operator & between the words.
+	The @@ operator is the matches operator. In our statement we are using it to check whether
+	the generated query term matches the lexemes.
+	*/
 	query := `
 	SELECT id, created_at, title, year, runtime, genres, version
 	FROM movies
-	WHERE (LOWER(title) = LOWER($1) OR $1 = '') 
+	WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
 	AND (genres @> $2 OR $2 = '{}')     
-	ORDER BY id`
+	ORDER BY id
+	`
 
 	// 3 second context timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
