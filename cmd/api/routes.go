@@ -5,7 +5,8 @@ import (
 	"net/http"
 )
 
-func (app *application)routes() *httprouter.Router {
+// Update to return http.Handler instead of *httprouter.Router because of middleware. 
+func (app *application)routes() http.Handler {
 	// Initialize httprouter
 	router := httprouter.New()
 
@@ -25,5 +26,5 @@ func (app *application)routes() *httprouter.Router {
 	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.deleteMovieHandler)
 
 	// return an httprouter.
-	return router
+	return app.recoverPanic(router)
 }

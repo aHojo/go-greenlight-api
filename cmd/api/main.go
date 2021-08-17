@@ -12,6 +12,7 @@ import (
 
 	// Import the pq driver. It will register itself with the db/sql pacakage.
 	"github.com/ahojo/greenlight/internal/data"
+	"github.com/ahojo/greenlight/internal/jsonlog"
 	_ "github.com/lib/pq"
 )
 
@@ -34,7 +35,7 @@ type config struct {
 // middleware
 type application struct {
 	config config
-	logger *log.Logger
+	logger *jsonlog.Logger
 	models data.Models
 }
 
@@ -54,13 +55,16 @@ func main() {
 
 	// Initialize a new logger which writes messages to the standard stream, prefixed
 	// with the current date and time
-	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	// logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 
 	db, err := openDB(cfg)
 	if err != nil {
-		logger.Fatal(err)
+		// logger.Fatal(err)
+		logger.PrintFatal(err, nil)
 	}
 	defer db.Close()
+	logger.PrintInfo("Database connection pool established", nil)
 
 	// Initialize our application
 	app := &application{
@@ -75,11 +79,19 @@ func main() {
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
+		// Create a new Go log.Logger instance with log.New()
+		// Pass in our custom logger as the first parameter.
+		// "" and 0 indicate that the log.Logger instance should not
+		// use a prefix or any flags
+		ErrorLog: log.New(logger, "", 0),
 	}
 
-	app.logger.Printf("Starting %s server on %s", app.config.env, srv.Addr)
+	logger.PrintInfo("Starting Server", map[string]string{
+		"addr": srv.Addr,
+		"env":  cfg.env,
+	})
 	err = srv.ListenAndServe()
-	app.logger.Fatal(err)
+	logger.PrintFatal(err, nil)
 }
 
 func openDB(cfg config) (*sql.DB, error) {
