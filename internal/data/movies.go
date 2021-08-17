@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
@@ -11,7 +12,7 @@ import (
 
 var (
 	ErrRecordNotFound = errors.New("no record matching request")
-	ErrEditConflict = errors.New("edit conflict")
+	ErrEditConflict   = errors.New("edit conflict")
 )
 
 // Models wraps all of our database models
@@ -73,8 +74,11 @@ func (m *MovieModel) Insert(movie *Movie) error {
 	// Create an args slice containing the values for the placeholder parameters from the movie struct
 	args := []interface{}{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	// Execute the query.
-	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
+	return m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
 // Get gets a specific movie from our database
@@ -86,14 +90,37 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 	}
 
 	// Sql query
+	// pq_sleep(10) to simulate a long running query
+	// stmt := `SELECT pg_sleep(10),id,created_at,title,year,runtime,genres,version
+	// 				 FROM movies
+	// 				 WHERE id = $1`
 	stmt := `SELECT id,created_at,title,year,runtime,genres,version
 					 FROM movies
 					 WHERE id = $1`
 	// declare a movie
 	var movie Movie
 
+	// ctx.WithTimeout() funciton to carry a 3 second timeout deadline.
+	// emtpy context.Background() is the parent context
+	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+
+	// IMPORTANT, use defer cancel() so we can cancel the context before Get() returns.
+	defer cancel()
+
+
+
 	// Execute the query NOTE: that we have to use pg.Array() here
-	err := m.DB.QueryRow(stmt, id).Scan(
+	// err := m.DB.QueryRow(stmt, id).Scan(
+	// 	&[]byte{}, // for the pg_sleep(10)
+	// 	&movie.ID,
+	// 	&movie.CreatedAt,
+	// 	&movie.Title,
+	// 	&movie.Year,
+	// 	&movie.Runtime,
+	// 	pq.Array(&movie.Genres),
+	// 	&movie.Version,
+	// )
+	err := m.DB.QueryRowContext(ctx, stmt, id).Scan(
 		&movie.ID,
 		&movie.CreatedAt,
 		&movie.Title,
@@ -118,6 +145,11 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 // Update updates a specific movie from our database
 func (m *MovieModel) Update(movie *Movie) error {
 
+	/* potential to use uuid here
+	UPDATE movies
+	SET title = $1, year = $2, runtime = $3, genres = $4, version = uuid_generate_v4()
+	WHERE id = $5 AND
+	**/
 	// Add version = $6, so we can stop race conditions
 	query := `
 	UPDATE movies
@@ -134,10 +166,13 @@ func (m *MovieModel) Update(movie *Movie) error {
 		pq.Array(movie.Genres),
 		movie.ID,
 		movie.Version, // Add the expected movie version
-	} 
+	}
 
-	// If no matching row could be found (version has been changed) 
-	err := m.DB.QueryRow(query, args...).Scan(&movie.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// If no matching row could be found (version has been changed)
+	err := m.DB.QueryRowContext(ctx,query, args...).Scan(&movie.Version)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -160,8 +195,11 @@ func (m *MovieModel) Delete(id int64) error {
 	DELETE FROM movies
 	WHERE id = $1`
 
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	// Returns sql.Result for how many rows affected
-	result,err := m.DB.Exec(query, id)
+	result, err := m.DB.ExecContext(ctx,query, id)
 	if err != nil {
 		return err
 	}
@@ -178,5 +216,3 @@ func (m *MovieModel) Delete(id int64) error {
 
 	return nil
 }
-
-
