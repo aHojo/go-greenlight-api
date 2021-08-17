@@ -1,6 +1,8 @@
 package data
 
 import (
+	"strings"
+
 	"github.com/ahojo/greenlight/internal/validator"
 )
 
@@ -22,4 +24,25 @@ func ValidateFilters(v *validator.Validator, f Filters) {
 
 	// Check that hte sort parameter matches a value in the safelist
 	v.Check(validator.In(f.Sort, f.SortSafelist...), "sort", "invalid sort value")
+}
+
+// Check that the client-provided sort field matches one of the entries in our safelist
+// and if it does, extract the column name from the Sort field by stripping the leading hyphen char
+// if it exists
+func (f Filters) sortColumn() string {
+	for _, safeValue := range f.SortSafelist {
+		if f.Sort == safeValue {
+			return strings.TrimPrefix(f.Sort, "-")
+		}
+	}
+
+	panic("unsafe sort parameter: " + f.Sort)
+}
+
+// Return the sort direct (ASC or DESC)
+func (f Filters) sortDirection() string {
+	if strings.HasPrefix(f.Sort, "-") {
+		return "DESC"
+	}
+	return "ASC"
 }

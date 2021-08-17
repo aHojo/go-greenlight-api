@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ahojo/greenlight/internal/validator"
@@ -173,13 +174,13 @@ func (m *MovieModel) GetAll(title string, gernres []string, filters Filters)([]*
 	The @@ operator is the matches operator. In our statement we are using it to check whether
 	the generated query term matches the lexemes.
 	*/
-	query := `
-	SELECT id, created_at, title, year, runtime, genres, version
-	FROM movies
-	WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
-	AND (genres @> $2 OR $2 = '{}')     
-	ORDER BY id
-	`
+	// query := `
+	// SELECT id, created_at, title, year, runtime, genres, version
+	// FROM movies
+	// WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
+	// AND (genres @> $2 OR $2 = '{}')     
+	// ORDER BY id
+	// `
 
 	/* could have also used ILIKE
 	SELECT id, created_at, title, year, runtime, genres, version
@@ -188,6 +189,16 @@ WHERE (title ILIKE $1 OR $1 = '')
 AND (genres @> $2 OR $2 = '{}')     
 ORDER BY id
 */ 
+
+	// Add an ORDER BY clause and interpolate the sort column and direction. Importantly
+  // notice that we also include a secondary sort on the movie ID to ensure a
+  // consistent ordering.
+	query := fmt.Sprintf(`
+	SELECT id, created_at, title, year, runtime, genres, version
+	FROM movies
+	WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
+	AND (genres @> $2 OR $2 = '{}')     
+	ORDER BY %s %s, id ASC`, filters.sortColumn(), filters.sortDirection())
 
 	// 3 second context timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
