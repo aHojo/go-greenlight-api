@@ -11,6 +11,7 @@ import (
 
 var (
 	ErrRecordNotFound = errors.New("no record matching request")
+	ErrEditConflict = errors.New("edit conflict")
 )
 
 // Models wraps all of our database models
@@ -117,10 +118,11 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 // Update updates a specific movie from our database
 func (m *MovieModel) Update(movie *Movie) error {
 
+	// Add version = $6, so we can stop race conditions
 	query := `
 	UPDATE movies
 	SET title = $1, year = $2, runtime = $3, genres = $4, version = version + 1
-	WHERE id = $5
+	WHERE id = $5 AND version = $6
 	RETURNING version 
 	`
 
@@ -131,9 +133,20 @@ func (m *MovieModel) Update(movie *Movie) error {
 		movie.Runtime,
 		pq.Array(movie.Genres),
 		movie.ID,
+		movie.Version, // Add the expected movie version
 	} 
 
-	return m.DB.QueryRow(query, args...).Scan(&movie.Version)
+	// If no matching row could be found (version has been changed) 
+	err := m.DB.QueryRow(query, args...).Scan(&movie.Version)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+		}
+	}
+	return nil
 }
 
 // Delete

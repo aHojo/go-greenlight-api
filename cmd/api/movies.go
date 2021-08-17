@@ -160,7 +160,12 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	// Update the movie after verified.
 	err = app.models.Movies.Update(movie)
     if err != nil {
+			switch {
+			case errors.Is(err, data.ErrEditConflict):
+				app.ErrEditConflictResponse(w,r)
+			default:
         app.serverErrorResponse(w, r, err)
+			}
         return
     }
 
