@@ -69,6 +69,47 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 
 }
 
+// listMoviesHandler will list multiple movies and allow us to paginate, sort, and filter.
+func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request) {
+	// input struct to hold expected values
+	var input struct {
+		Title   string
+		Genres  []string
+		Page    int
+		PagSize int
+		Sort    string
+	}
+
+	// Initialize a validator
+	v := validator.New()
+
+	// Call r.Url.Query to get the url.Values map containing the Query string data.
+	qs := r.URL.Query()
+
+	// Use the helper functions we defined to get the title and genres query string values
+	// Fall back to defaults of an empty string and an empty string slice
+	input.Title = app.readString(qs, "title", "")
+	input.Genres = app.readCSV(qs, "genres", []string{})
+
+	// Get the page and page_size query string values as integers. Notice that we set
+	// the default page value to 1 and default page_size to 20, and that we pass the
+	// validator instance as the final argument here
+	input.Page = app.readInt(qs, "page", 1, v)
+	input.PagSize = app.readInt(qs, "page_size", 20, v)
+
+	// Extract the sort query string value, falling back to "id" if it is not provided
+	input.Sort = app.readString(qs, "sort", "id")
+
+	// Check the validator
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// Dump the contents of the input struct in a http resposne
+	fmt.Fprintf(w, "%v\n", input)
+}
+
 // showMovieHandler for "GET /v1/movies/:id"
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -122,13 +163,12 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	// input struct for the expected values from the client
 	// NOTE: pointers have a nil zero value.
 	var input struct {
-		Title   *string       `json:"title"` // Will be nil if not given
-		Year    *int32        `json:"year"` // Will be nil if not given
+		Title   *string       `json:"title"`   // Will be nil if not given
+		Year    *int32        `json:"year"`    // Will be nil if not given
 		Runtime *data.Runtime `json:"runtime"` // Will be nil if not given
-		Genres  []string     `json:"genres"` // slice already has a nil zero value
+		Genres  []string      `json:"genres"`  // slice already has a nil zero value
 	}
 
-	
 	// Read the JSON
 	err = app.readJSON(w, r, &input)
 	if err != nil {
@@ -136,7 +176,7 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Copy the values from the request body to the movie struct
-	// If these are nil we know that it was not given in the request body. 
+	// If these are nil we know that it was not given in the request body.
 	if input.Title != nil {
 		movie.Title = *input.Title
 	}
@@ -153,25 +193,25 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	// Validation that the data is ok.
 	v := validator.New()
 	if data.ValidateMovie(v, movie); !v.Valid() {
-		app.failedValidationResponse(w,r,v.Errors)
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
 	// Update the movie after verified.
 	err = app.models.Movies.Update(movie)
-    if err != nil {
-			switch {
-			case errors.Is(err, data.ErrEditConflict):
-				app.ErrEditConflictResponse(w,r)
-			default:
-        app.serverErrorResponse(w, r, err)
-			}
-        return
-    }
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.ErrEditConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
 
 	err = app.writeJSON(w, http.StatusOK, envelope{"movie": movie}, nil)
 	if err != nil {
-		app.serverErrorResponse(w,r,err)
+		app.serverErrorResponse(w, r, err)
 	}
 
 }
@@ -180,24 +220,24 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 	// Extract the movie ID from the URL.
 	id, err := app.readIDParam(r)
 	if err != nil {
-			app.notFoundResponse(w, r)
-			return
+		app.notFoundResponse(w, r)
+		return
 	}
 	// Delete the movie from the database, sending a 404 Not Found response to the
 	// client if there isn't a matching record.
 	err = app.models.Movies.Delete(id)
 	if err != nil {
-			switch {
-			case errors.Is(err, data.ErrRecordNotFound):
-					app.notFoundResponse(w, r)
-			default:
-					app.serverErrorResponse(w, r, err)
-			}
-			return
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
 	}
 	// Return a 200 OK status code along with a success message.
 	err = app.writeJSON(w, http.StatusOK, envelope{"message": "movie successfully deleted"}, nil)
 	if err != nil {
-			app.serverErrorResponse(w, r, err)
+		app.serverErrorResponse(w, r, err)
 	}
 }

@@ -6,16 +6,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
+	"github.com/ahojo/greenlight/internal/validator"
 	"github.com/julienschmidt/httprouter"
 )
 
 type envelope map[string]interface{}
 
 // readIDParam - gets the ID URL parameter from the current context
-func (app *application) readIDParam(r *http.Request) (int64, error){
+func (app *application) readIDParam(r *http.Request) (int64, error) {
 	// When httprouter parses a request, interpolated parameters will be stored
 	// in the request context. Use ParamsFromContext() function to
 	// get the slice containing them.
@@ -61,7 +63,7 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst int
 
 	// limit the size to 1MB
 	maxBytes := 1_048_576
-	r.Body = http.MaxBytesReader(w,r.Body,int64(maxBytes))
+	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes))
 
 	// Initialize the json.Decoder. call the DisallowedUnknownFields() method on it before decoding.
 	// If there is a field that is not in our map(dst) there will be an error
@@ -77,41 +79,89 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst int
 		var unmarshalTypeError *json.UnmarshalTypeError
 		var invalidUnmarshalError *json.InvalidUnmarshalError
 
-		switch{
-			// Use the error.As() function to check whether the error has the type *json.SyntaxError
-			case errors.As(err, &syntaxError):
-				return fmt.Errorf("body contains badly-formed JSON (at character %d)", syntaxError.Offset)
-			// If Decode() returns an io.ErrUnexpectedEOR
-			case errors.Is(err, io.ErrUnexpectedEOF):
-				return errors.New("body contains badly-formed JSON")
-			case errors.As(err, &unmarshalTypeError):
-				return fmt.Errorf("body contains incorrect JSON type field %q", unmarshalTypeError.Field)
-			
-			case errors.Is(err, io.EOF):
-				return errors.New("body must not be empty")
-			case errors.As(err, &invalidUnmarshalError):
-				panic(err)
-			// if the JSON contains a field which can't be mapped to the target destination
-			//Decode() will now return an error message in the format "json: unknown // field "<name>"".
-			case strings.HasPrefix(err.Error(), "json: unknown field "):
-				fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
-				return fmt.Errorf("body contains unknown key %s", fieldName)
-			
-			// If the body exceeds maxBytes decode will fail "http: request body too large"
-			case err.Error() == "http: request body too large":
-				return fmt.Errorf("body must be not larger than %d bytes", maxBytes)
-			default:
-				return err
+		switch {
+		// Use the error.As() function to check whether the error has the type *json.SyntaxError
+		case errors.As(err, &syntaxError):
+			return fmt.Errorf("body contains badly-formed JSON (at character %d)", syntaxError.Offset)
+		// If Decode() returns an io.ErrUnexpectedEOR
+		case errors.Is(err, io.ErrUnexpectedEOF):
+			return errors.New("body contains badly-formed JSON")
+		case errors.As(err, &unmarshalTypeError):
+			return fmt.Errorf("body contains incorrect JSON type field %q", unmarshalTypeError.Field)
+
+		case errors.Is(err, io.EOF):
+			return errors.New("body must not be empty")
+		case errors.As(err, &invalidUnmarshalError):
+			panic(err)
+		// if the JSON contains a field which can't be mapped to the target destination
+		//Decode() will now return an error message in the format "json: unknown // field "<name>"".
+		case strings.HasPrefix(err.Error(), "json: unknown field "):
+			fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
+			return fmt.Errorf("body contains unknown key %s", fieldName)
+
+		// If the body exceeds maxBytes decode will fail "http: request body too large"
+		case err.Error() == "http: request body too large":
+			return fmt.Errorf("body must be not larger than %d bytes", maxBytes)
+		default:
+			return err
 		}
 	}
 
-	// Call Decode() again, using a pointer to an empty anon struct as the destination. 
+	// Call Decode() again, using a pointer to an empty anon struct as the destination.
 	// If the r.Body only contained a single JSON value, this will return an io.EOF
 	// if anything else we don't process and send an error.
 	err = dec.Decode(&struct{}{})
 	if err != io.EOF {
 		return errors.New("body must only contain a single JSON value")
 	}
-	
+
 	return nil
+}
+
+// readString() returns a string value from the query string, or
+// a default value if no matching key could be found.
+func (app *application) readString(qs url.Values, key string, defaultValue string) string {
+
+	// Extract the value for a given key from the query string
+	// Default value if no key exists
+	s := qs.Get(key)
+	if s == "" {
+		return defaultValue
+	}
+
+	return s
+}
+
+// readCSV() reads a string value from the query string
+// splits it into a slice on the comma.
+// returns a default value if it can not be found
+func (app *application) readCSV(qs url.Values, key string, defaultValue []string) []string {
+
+	// Extract the value from the query string
+	csv := qs.Get(key)
+	if csv == "" {
+		return defaultValue
+	}
+
+	return strings.Split(csv, ",")
+}
+
+// readInt() helper reads a string value from the query string and converts it to an
+// integer before returning. If no matching key could be found it returns the provided
+// default value. If the value couldn't be converted to an integer, then we record an
+// error message in the provided Validator instance.
+func (app *application) readInt(qs url.Values, key string, defaultValue int, v *validator.Validator) int {
+	s := qs.Get(key)
+	if s == "" {
+		return defaultValue
+	}
+
+	// Try to convert to int
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		v.AddError(key, "must be an integer value")
+		return defaultValue
+	}
+	
+	return i
 }
