@@ -198,15 +198,22 @@ ORDER BY id
 	FROM movies
 	WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
 	AND (genres @> $2 OR $2 = '{}')     
-	ORDER BY %s %s, id ASC`, filters.sortColumn(), filters.sortDirection())
+	ORDER BY %s %s, id ASC
+	LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
 
 	// 3 second context timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
 	defer cancel()
 
+	args := []interface{}{
+		title,
+		pq.Array(gernres),
+		filters.limit(),
+		filters.offset(),
+	}
 	// Get back the data from the database. Cancels if takes too long
 	// Title and genres have the default params.
-	rows, err := m.DB.QueryContext(ctx, query, title, pq.Array(gernres))
+	rows, err := m.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
