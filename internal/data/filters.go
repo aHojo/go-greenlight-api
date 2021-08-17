@@ -1,8 +1,6 @@
 package data
 
 import (
-	"fmt"
-
 	"github.com/ahojo/greenlight/internal/validator"
 )
 

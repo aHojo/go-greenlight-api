@@ -64,23 +64,11 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
-// Insert inserts a new movie record
-func (m *MovieModel) Insert(movie *Movie) error {
-	// Define the SQL query for inserting a new record in the movies table and returning the system generated data
-	query := `INSERT INTO movies (title, year, runtime, genres) 
-						VALUES ($1, $2, $3, $4)
-						RETURNING id, created_at, version`
+/* DATABASE QUERIES */ 
 
-	// Create an args slice containing the values for the placeholder parameters from the movie struct
-	args := []interface{}{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	// Execute the query.
-	return m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
-}
-
+/** 
+GET METHODS
+*/
 // Get gets a specific movie from our database
 func (m *MovieModel) Get(id int64) (*Movie, error) {
 	// The postgresql bigserial type starts autoincrementing at 1.
@@ -140,6 +128,78 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 	}
 
 	return &movie, err
+}
+
+// GetAll returns a slice of Movies. 
+func (m *MovieModel) GetAll(title string, gernres []string, filters Filters)([]*Movie, error) {
+	// Sql Query
+	query := `
+	SELECT id, created_at, title, year, runtime, genres, version
+	FROM movies
+	ORDER BY id
+	`
+
+	// 3 second context timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	defer cancel()
+
+	// Get back the data from the database. Cancels if takes too long
+	rows, err := m.DB.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	// Make sure to close the rows stream return
+	defer rows.Close()
+
+	// data structure to hold all of our movies
+	var movies = []*Movie{}
+
+	// Iterate through the rows returned
+	for rows.Next() {
+		var movie Movie
+
+		// Scan the values from the row into the Movie
+		// Note: pq.Array() again
+		err := rows.Scan(
+			&movie.ID,
+			&movie.CreatedAt,
+			&movie.Title,
+			&movie.Year,
+			&movie.Runtime,
+			pq.Array(&movie.Genres),
+			&movie.Version,
+		)
+		if err != nil {
+			return nil, err
+		}
+		movies = append(movies, &movie)
+	}
+
+	// When the rows.Next() finishes, if there is an error it's in rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return movies, nil
+
+} 
+
+// Insert inserts a new movie record
+func (m *MovieModel) Insert(movie *Movie) error {
+	// Define the SQL query for inserting a new record in the movies table and returning the system generated data
+	query := `INSERT INTO movies (title, year, runtime, genres) 
+						VALUES ($1, $2, $3, $4)
+						RETURNING id, created_at, version`
+
+	// Create an args slice containing the values for the placeholder parameters from the movie struct
+	args := []interface{}{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Execute the query.
+	return m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
 // Update updates a specific movie from our database
