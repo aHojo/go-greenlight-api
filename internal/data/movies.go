@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ahojo/greenlight/internal/validator"
+	"github.com/lib/pq"
 )
 
 // Models wraps all of our database models
@@ -57,7 +58,16 @@ type MovieModel struct {
 
 // Insert inserts a new movie record
 func (m *MovieModel) Insert(movie *Movie) error {
-	return nil 
+	// Define the SQL query for inserting a new record in the movies table and returning the system generated data
+	query := `INSERT INTO movies (title, year, runtime, genres) 
+						VALUES ($1, $2, $3, $4)
+						RETURNING id, created_at, version`
+	
+	// Create an args slice containing the values for the placeholder parameters from the movie struct
+	args := []interface{}{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
+
+	// Execute the query. 
+	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 // Get gets a specific movie from our database
 func (m *MovieModel) Get(movie *Movie) error {

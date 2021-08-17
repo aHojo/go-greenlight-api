@@ -30,24 +30,43 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 
 	// Start of validation
 	v := validator.New()
+
 	movie := &data.Movie{
-		Title: input.Title,
-		Year: input.Year,
+		Title:   input.Title,
+		Year:    input.Year,
 		Runtime: input.Runtime,
-		Genres: input.Genres,
+		Genres:  input.Genres,
 	}
 
 	data.ValidateMovie(v, movie)
 
-	// Use the valid method to see if any of the checks failed. If they did, then use 
+	// Use the valid method to see if any of the checks failed. If they did, then use
 	// failedValidationResponse() helper to send a response to the client
 	if !v.Valid() {
-		app.failedValidationResponse(w,r,v.Errors)
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
-	// Dump the contents of the input struct in a HTTP response
-	fmt.Fprintf(w, "%v\n", input)
+	// Call the Insert() method on our model.
+	// Creates a record in the database, and update the movie struct passed in with the
+	// system generated info
+	err = app.models.Movies.Insert(movie)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// When sending an HTTP response, we want to include a Location header to let the
+	// client know which URL they can find the new-resource at.
+	headers := make(http.Header)
+	headers.Set("Location", fmt.Sprintf("/v1/movie/%d", movie.ID))
+
+	// Write a json response with a 201 Created 
+	err = app.writeJSON(w, http.StatusCreated, envelope{"movie": movie}, headers)
+	if err != nil {
+		app.serverErrorResponse(w,r,err)
+	}
+
 }
 
 // showMovieHandler for "GET /v1/movies/:id"
