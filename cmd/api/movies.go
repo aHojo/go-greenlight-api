@@ -120,11 +120,12 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	// input struct for the expected values from the client
+	// NOTE: pointers have a nil zero value.
 	var input struct {
-		Title   string       `json:"title"`
-		Year    int32        `json:"year"`
-		Runtime data.Runtime `json:"runtime"`
-		Genres  []string     `json:"genres"`
+		Title   *string       `json:"title"` // Will be nil if not given
+		Year    *int32        `json:"year"` // Will be nil if not given
+		Runtime *data.Runtime `json:"runtime"` // Will be nil if not given
+		Genres  []string     `json:"genres"` // slice already has a nil zero value
 	}
 
 	
@@ -135,10 +136,19 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Copy the values from the request body to the movie struct
-	movie.Title = input.Title
-	movie.Year = input.Year
-	movie.Runtime = input.Runtime
-	movie.Genres = input.Genres
+	// If these are nil we know that it was not given in the request body. 
+	if input.Title != nil {
+		movie.Title = *input.Title
+	}
+	if input.Year != nil {
+		movie.Year = *input.Year
+	}
+	if input.Runtime != nil {
+		movie.Runtime = *input.Runtime
+	}
+	if input.Genres != nil {
+		movie.Genres = input.Genres
+	}
 
 	// Validation that the data is ok.
 	v := validator.New()
@@ -146,6 +156,13 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		app.failedValidationResponse(w,r,v.Errors)
 		return
 	}
+
+	// Update the movie after verified.
+	err = app.models.Movies.Update(movie)
+    if err != nil {
+        app.serverErrorResponse(w, r, err)
+        return
+    }
 
 	err = app.writeJSON(w, http.StatusOK, envelope{"movie": movie}, nil)
 	if err != nil {
