@@ -2,10 +2,15 @@ package data
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/ahojo/greenlight/internal/validator"
 	"github.com/lib/pq"
+)
+
+var (
+	ErrRecordNotFound = errors.New("no record matching request")
 )
 
 // Models wraps all of our database models
@@ -13,12 +18,13 @@ type Models struct {
 	Movies MovieModel
 }
 
-// Creates a Models that holds all of our database models. 
+// Creates a Models that holds all of our database models.
 func NewModels(db *sql.DB) Models {
 	return Models{
 		Movies: MovieModel{DB: db},
 	}
 }
+
 // Movie data that we will reutrn as JSON
 // The props all need to be exported
 type Movie struct {
@@ -62,25 +68,58 @@ func (m *MovieModel) Insert(movie *Movie) error {
 	query := `INSERT INTO movies (title, year, runtime, genres) 
 						VALUES ($1, $2, $3, $4)
 						RETURNING id, created_at, version`
-	
+
 	// Create an args slice containing the values for the placeholder parameters from the movie struct
 	args := []interface{}{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
 
-	// Execute the query. 
+	// Execute the query.
 	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
+
 // Get gets a specific movie from our database
-func (m *MovieModel) Get(movie *Movie) error {
-	return nil 
+func (m *MovieModel) Get(id int64) (*Movie, error) {
+	// The postgresql bigserial type starts autoincrementing at 1.
+	// No movies will have a value below 1.
+	if id < 1 {
+		return nil, ErrRecordNotFound
+	}
+
+	// Sql query
+	stmt := `SELECT id,created_at,title,year,runtime,genres,version
+					 FROM movies
+					 WHERE id = $1`
+	// declare a movie
+	var movie Movie
+
+	// Execute the query NOTE: that we have to use pg.Array() here
+	err := m.DB.QueryRow(stmt, id).Scan(
+		&movie.ID,
+		&movie.CreatedAt,
+		&movie.Title,
+		&movie.Year,
+		&movie.Runtime,
+		pq.Array(&movie.Genres),
+		&movie.Version,
+	)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &movie, err
 }
 
 // Update updates a specific movie from our database
 func (m *MovieModel) Update(movie *Movie) error {
-	return nil 
+	return nil
 }
 
 // Delete
 func (m *MovieModel) Delete(id int64) error {
-	return nil 
+	return nil
 }
-
