@@ -19,12 +19,14 @@ var (
 // Models wraps all of our database models
 type Models struct {
 	Movies MovieModel
+	Users  UserModel
 }
 
 // Creates a Models that holds all of our database models.
 func NewModels(db *sql.DB) Models {
 	return Models{
 		Movies: MovieModel{DB: db},
+		Users: UserModel{DB: db},
 	}
 }
 
@@ -65,9 +67,9 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
-/* DATABASE QUERIES */ 
+/* DATABASE QUERIES */
 
-/** 
+/**
 GET METHODS
 */
 // Get gets a specific movie from our database
@@ -91,12 +93,10 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 
 	// ctx.WithTimeout() funciton to carry a 3 second timeout deadline.
 	// emtpy context.Background() is the parent context
-	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 
 	// IMPORTANT, use defer cancel() so we can cancel the context before Get() returns.
 	defer cancel()
-
-
 
 	// Execute the query NOTE: that we have to use pg.Array() here
 	// err := m.DB.QueryRow(stmt, id).Scan(
@@ -131,8 +131,8 @@ func (m *MovieModel) Get(id int64) (*Movie, error) {
 	return &movie, err
 }
 
-// GetAll returns a slice of Movies. 
-func (m *MovieModel) GetAll(title string, gernres []string, filters Filters)([]*Movie, Metadata, error) {
+// GetAll returns a slice of Movies.
+func (m *MovieModel) GetAll(title string, gernres []string, filters Filters) ([]*Movie, Metadata, error) {
 	// Sql Query
 	// query := `
 	// SELECT id, created_at, title, year, runtime, genres, version
@@ -154,11 +154,11 @@ func (m *MovieModel) GetAll(title string, gernres []string, filters Filters)([]*
 
 		https://www.postgresql.org/docs/9.6/functions-array.html
 	*/
-		// query := `
+	// query := `
 	// SELECT id, created_at, title, year, runtime, genres, version
 	// FROM movies
-	// WHERE (LOWER(title) = LOWER($1) OR $1 = '') 
-	// AND (genres @> $2 OR $2 = '{}')     
+	// WHERE (LOWER(title) = LOWER($1) OR $1 = '')
+	// AND (genres @> $2 OR $2 = '{}')
 	// ORDER BY id`
 
 	/* Add FULL TEXT SEARCH PostgreSQL feature
@@ -177,22 +177,22 @@ func (m *MovieModel) GetAll(title string, gernres []string, filters Filters)([]*
 	// query := `
 	// SELECT id, created_at, title, year, runtime, genres, version
 	// FROM movies
-	// WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
-	// AND (genres @> $2 OR $2 = '{}')     
+	// WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
+	// AND (genres @> $2 OR $2 = '{}')
 	// ORDER BY id
 	// `
 
 	/* could have also used ILIKE
-	SELECT id, created_at, title, year, runtime, genres, version
-FROM movies
-WHERE (title ILIKE $1 OR $1 = '') 
-AND (genres @> $2 OR $2 = '{}')     
-ORDER BY id
-*/ 
+		SELECT id, created_at, title, year, runtime, genres, version
+	FROM movies
+	WHERE (title ILIKE $1 OR $1 = '')
+	AND (genres @> $2 OR $2 = '{}')
+	ORDER BY id
+	*/
 
 	// Add an ORDER BY clause and interpolate the sort column and direction. Importantly
-  // notice that we also include a secondary sort on the movie ID to ensure a
-  // consistent ordering.
+	// notice that we also include a secondary sort on the movie ID to ensure a
+	// consistent ordering.
 	// Added the window function to count the number of (filtered) records
 	query := fmt.Sprintf(`
 	SELECT COUNT(*) OVER(),id, created_at, title, year, runtime, genres, version
@@ -203,7 +203,7 @@ ORDER BY id
 	LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
 
 	// 3 second context timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	args := []interface{}{
@@ -258,7 +258,7 @@ ORDER BY id
 
 	return movies, metadata, nil
 
-} 
+}
 
 // Insert inserts a new movie record
 func (m *MovieModel) Insert(movie *Movie) error {
@@ -307,7 +307,7 @@ func (m *MovieModel) Update(movie *Movie) error {
 	defer cancel()
 
 	// If no matching row could be found (version has been changed)
-	err := m.DB.QueryRowContext(ctx,query, args...).Scan(&movie.Version)
+	err := m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.Version)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -334,7 +334,7 @@ func (m *MovieModel) Delete(id int64) error {
 	defer cancel()
 
 	// Returns sql.Result for how many rows affected
-	result, err := m.DB.ExecContext(ctx,query, id)
+	result, err := m.DB.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
