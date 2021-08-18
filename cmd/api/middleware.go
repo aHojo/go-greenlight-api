@@ -54,7 +54,7 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 			// Loop through all the clients. If they haven't been seen within the last three minutes
 			// delete them
 			for ip, client := range clients {
-				if time.Since(client.lastSeen) > 3 * time.Minute {
+				if time.Since(client.lastSeen) > 3*time.Minute {
 					delete(clients, ip)
 				}
 			}
@@ -74,41 +74,43 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 	// variable.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		// Extract the client's IP address
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			app.serverErrorResponse(w, r, err)
-			return
-		}
+		// Only carry out rate limiting if it is enabled. 
+		if app.config.limiter.enabled {
+			// Extract the client's IP address
+			ip, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				app.serverErrorResponse(w, r, err)
+				return
+			}
 
-		// Lock the mutex to pevent this code from being executed concurrently
-		mu.Lock()
+			// Lock the mutex to pevent this code from being executed concurrently
+			mu.Lock()
 
-		// Check to see if the ip address already exists
-		// If it doesn't initialize a new rate limiter andd add the IP and limiter to the map
-		if _, found := clients[ip]; !found {
-			clients[ip] = &client{ limiter: rate.NewLimiter(2, 4)}
-		}
-		clients[ip].lastSeen = time.Now()
-		// Call limiter.Allow() to see if the request is permitted, and if it's not,
-		// then we call the rateLimitExceededResponse() helper to return a 429 Too Many
-		// Requests response (we will create this helper in a minute).
-		// if !limiter.Allow() {
-		// 	app.rateLimitExceededResponse(w, r)
-		// 	return
-		// }
-		if !clients[ip].limiter.Allow() {
+			// Check to see if the ip address already exists
+			// If it doesn't initialize a new rate limiter andd add the IP and limiter to the map
+			if _, found := clients[ip]; !found {
+				clients[ip] = &client{limiter: rate.NewLimiter(2, 4)}
+			}
+			clients[ip].lastSeen = time.Now()
+			// Call limiter.Allow() to see if the request is permitted, and if it's not,
+			// then we call the rateLimitExceededResponse() helper to return a 429 Too Many
+			// Requests response (we will create this helper in a minute).
+			// if !limiter.Allow() {
+			// 	app.rateLimitExceededResponse(w, r)
+			// 	return
+			// }
+			if !clients[ip].limiter.Allow() {
+				mu.Unlock()
+				app.rateLimitExceededResponse(w, r)
+				return
+			}
+
+			// Very importantly, unlock the mutex before calling the next handler in the
+			// chain. Notice that we DON'T use defer to unlock the mutex, as that would mean
+			// that the mutex isn't unlocked until all the handlers downstream of this
+			// middleware have also returned.
 			mu.Unlock()
-			app.rateLimitExceededResponse(w, r)
-			return
 		}
-
-		// Very importantly, unlock the mutex before calling the next handler in the
-		// chain. Notice that we DON'T use defer to unlock the mutex, as that would mean
-		// that the mutex isn't unlocked until all the handlers downstream of this
-		// middleware have also returned.
-		mu.Unlock()
-
 		next.ServeHTTP(w, r)
 	})
 }
