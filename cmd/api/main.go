@@ -4,9 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"fmt"
-	"log"
-	"net/http"
 	"os"
 	"time"
 
@@ -85,26 +82,32 @@ func main() {
 		logger: logger,
 		models: data.NewModels(db),
 	}
-	// Declare a HTTP server with some sensible timeout settings
-	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", app.config.port),
-		Handler:      app.routes(), // Using the httprouter instance here.
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		// Create a new Go log.Logger instance with log.New()
-		// Pass in our custom logger as the first parameter.
-		// "" and 0 indicate that the log.Logger instance should not
-		// use a prefix or any flags
-		ErrorLog: log.New(logger, "", 0),
+	// // Declare a HTTP server with some sensible timeout settings
+	// srv := &http.Server{
+	// 	Addr:         fmt.Sprintf(":%d", app.config.port),
+	// 	Handler:      app.routes(), // Using the httprouter instance here.
+	// 	IdleTimeout:  time.Minute,
+	// 	ReadTimeout:  10 * time.Second,
+	// 	WriteTimeout: 30 * time.Second,
+	// 	// Create a new Go log.Logger instance with log.New()
+	// 	// Pass in our custom logger as the first parameter.
+	// 	// "" and 0 indicate that the log.Logger instance should not
+	// 	// use a prefix or any flags
+	// 	ErrorLog: log.New(logger, "", 0),
+	// }
+
+	// logger.PrintInfo("Starting Server", map[string]string{
+	// 	"addr": srv.Addr,
+	// 	"env":  cfg.env,
+	// })
+	// err = srv.ListenAndServe()
+
+	// Start the server now
+	err = app.serve()
+	if err != nil {
+		logger.PrintFatal(err, nil)
 	}
 
-	logger.PrintInfo("Starting Server", map[string]string{
-		"addr": srv.Addr,
-		"env":  cfg.env,
-	})
-	err = srv.ListenAndServe()
-	logger.PrintFatal(err, nil)
 }
 
 func openDB(cfg config) (*sql.DB, error) {
