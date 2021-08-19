@@ -59,14 +59,23 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 			v.AddError("email", "a user with this email already exists")
 			app.failedValidationResponse(w, r, v.Errors)
 		default:
-			app.serverErrorResponse(w,r,err)
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
 
-	// Write the json response 
-	err = app.writeJSON(w,http.StatusCreated, envelope{"user": user}, nil)
+	// Call the send method to send the emailcom
+	// fmt.Printf("%+v\n%+v", app.config, user)
+	// err = app.mailer.Send(user.Email, "user_welcome.gotmpl", user)
+	// if err != nil {
+	// 	app.serverErrorResponse(w, r, err)
+	// 	return
+	// }
+
+	// Write the json response
+	err = app.writeJSON(w, http.StatusCreated, envelope{"user": user}, nil)
 	if err != nil {
-		app.serverErrorResponse(w,r,err)
+		app.serverErrorResponse(w, r, err)
 	}
+
 }
