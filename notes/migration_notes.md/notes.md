@@ -121,3 +121,39 @@ Execute the migration
 ```sql
 migrate -path=./migrations -database=$GREENLIGHT_DB_DSN up
 ```
+05 Tokens Table
+This will be used to identify and activate a user. 
+```sql
+migrate create -seq -ext .sql -dir ./migrations create_tokens_table
+/home/ahojo/development/go/src/go-greenlight-api/migrations/000005_create_tokens_table.up.sql
+/home/ahojo/development/go/src/go-greenlight-api/migrations/000005_create_tokens_table.down.sql
+```
+
+up migration
+```sql
+CREATE TABLE IF NOT EXISTS tokens (
+  hash bytea PRIMARY KEY,
+  user_id bigint NOT NULL REFERENCES users ON DELETE CASCADE,
+  expiry timestamp(0) with time zone NOT NULL,
+  scope text NOT NULL
+);
+```
+
+down migration
+```sql
+DROP TABLE IF EXISTS tokens;
+```
+
+- The hash column will contain a SHA-256 hash of the activation token. It’s important to
+emphasize that we will only store a hash of the activation token in our database — not
+the activation token itself.
+- The `user_id` column will contain the ID of the user associated with the token. We use the REFERENCES user syntax to create a foreign key constraint against the primary key of our users table, which ensures that any value in the `user_id` column has a corresponding id entry in our users table.
+*We also use the ON `DELETE CASCADE` syntax to instruct PostgreSQL to automatically delete all records for a user in our tokens table when the parent record in the users table is deleted.*
+- The expiry column will contain the time that we consider a token to be ‘expired’ and no
+longer valid. 
+- Lastly, the scope column will denote what purpose the token can be used for. Later in the book we’ll also need to create and store authentication tokens, and most of the code and storage requirements for these is exactly the same as for our activation tokens. So instead of creating separate tables (and the code to interact with them), we’ll store them in one table with a value in the scope column to restrict the purpose that the token can be used for.
+
+Do the migrations 
+```
+migrate -path=./migrations -database=$GREENLIGHT_DB_DSN up
+```

@@ -27,6 +27,7 @@ func (app *application)routes() http.Handler {
 
 	// Route to create our user
 	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)
+	router.HandlerFunc(http.MethodPut, "/v1/users/activated", app.activateUserHandler)
 	
 
 	// return an httprouter.
