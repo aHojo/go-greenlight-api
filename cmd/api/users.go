@@ -64,13 +64,18 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Call the send method to send the emailcom
-	// fmt.Printf("%+v\n%+v", app.config, user)
-	// err = app.mailer.Send(user.Email, "user_welcome.gotmpl", user)
-	// if err != nil {
-	// 	app.serverErrorResponse(w, r, err)
-	// 	return
-	// }
+	// use the background helper to send the emails using an anon function.
+	app.background(func() {
+		// We are using a third party sender, and a panic can happen. We will have to recover from it.
+		// Call the send method to send the emailcom
+		err = app.mailer.Send(user.Email, "user_welcome.gotmpl", user)
+		if err != nil {
+			// Important - if there is an error sending the email then we us the
+			// app.logger.PrintError() helper to manage it
+			// Because we do not want to send a status code. This code will complete after the handler.
+			app.logger.PrintError(err, nil)
+		}
+	})
 
 	// Write the json response
 	err = app.writeJSON(w, http.StatusCreated, envelope{"user": user}, nil)
