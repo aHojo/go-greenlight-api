@@ -133,7 +133,7 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		authorizationHeader := r.Header.Get("Authorization")
 
 		// If there is no Authorization found. use the contextSetUser() helper
-		// to make an Anon user and add it to the request context. 
+		// to make an Anon user and add it to the request context.
 		// Then call the next handler in the chain.
 		if authorizationHeader == "" {
 			r = app.contextSetUser(r, data.AnonymousUser)
@@ -141,13 +141,12 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-
-		// If there is an Auth header it should be in the format "Bearer <token>" 
+		// If there is an Auth header it should be in the format "Bearer <token>"
 		// Try to split it into it's parts
 		// if not in the right format return a 401 to the user
 		headerParts := strings.Split(authorizationHeader, " ")
 		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-			app.invalidAuthenticationTokenResponse(w,r)
+			app.invalidAuthenticationTokenResponse(w, r)
 			return
 		}
 
@@ -159,7 +158,7 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 
 		// If the token is not valid
 		if data.ValidateTokenPlaintext(v, token); !v.Valid() {
-			app.invalidAuthenticationTokenResponse(w,r,)
+			app.invalidAuthenticationTokenResponse(w, r)
 			return
 		}
 
@@ -168,9 +167,9 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		if err != nil {
 			switch {
 			case errors.Is(err, data.ErrRecordNotFound):
-				app.invalidAuthenticationTokenResponse(w,r)
+				app.invalidAuthenticationTokenResponse(w, r)
 			default:
-				app.serverErrorResponse(w,r,err)
+				app.serverErrorResponse(w, r, err)
 			}
 			return
 		}
@@ -179,5 +178,62 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		r = app.contextSetUser(r, user)
 		next.ServeHTTP(w, r)
 	})
+}
 
+/*
+Notice here that our requireActivatedUser() middleware has a slightly different signature
+to the other middleware we’ve built in this book. Instead of accepting and returning a
+http.Handler, it accepts and returns a http.HandlerFunc.
+
+This is a small change, but it makes it possible to wrap our /v1/movie** handler functions
+directly with this middleware, without needing to make any further conversions
+*/
+// func (app *application) requiredActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+// 		// Use contextGetUser() to retrieve the user from the context
+// 		user := app.contextGetUser(r)
+
+// 		// if the user is anonymous, then call the authenticationRequiredREsponse
+// 		if user.IsAnonymous() {
+// 			app.authenticationRequiredResponse(w, r)
+// 			return
+// 		}
+// 		// if the user is not activated, use the inactiveUserResposne
+// 		if !user.Activated {
+// 			app.inactiveAccountResponse(w, r)
+// 			return
+// 		}
+
+// 		next.ServeHTTP(w, r)
+// 	})
+// }
+
+// requireAuthenticatedUser middleware to check that a user is not anonymous
+func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+		if user.IsAnonymous() {
+			app.authenticationRequiredResponse(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// Checks that a user is both authenticated and activated.
+func (app *application) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+	// Rather than returning this http.HandlerFunc we assign it to the variable fn.
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+		// Check that a user is activated.
+		if !user.Activated {
+			app.inactiveAccountResponse(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+	// Wrap fn with the requireAuthenticatedUser() middleware before returning it.
+	return app.requireAuthenticatedUser(fn)
 }

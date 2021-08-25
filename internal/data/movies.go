@@ -18,17 +18,19 @@ var (
 
 // Models wraps all of our database models
 type Models struct {
-	Movies MovieModel
-	Users  UserModel
-	Token  TokenModel
+	Movies      MovieModel
+	Users       UserModel
+	Token       TokenModel
+	Permissions PermissionModel
 }
 
 // Creates a Models that holds all of our database models.
 func NewModels(db *sql.DB) Models {
 	return Models{
-		Movies: MovieModel{DB: db},
-		Users: UserModel{DB: db},
-		Token: TokenModel{DB: db}, 
+		Movies:      MovieModel{DB: db},
+		Users:       UserModel{DB: db},
+		Token:       TokenModel{DB: db},
+		Permissions: PermissionModel{DB: db},
 	}
 }
 
