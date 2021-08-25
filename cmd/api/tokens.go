@@ -61,6 +61,7 @@ func (app *application) createAuthenticationTokenHandler(w http.ResponseWriter, 
 		return
 	}
 
+
 	// If the passwords match, generate a new 24 hour token
 	token, err := app.models.Token.New(user.ID, 24*time.Hour, data.ScopeAuthentication)
 	if err != nil {

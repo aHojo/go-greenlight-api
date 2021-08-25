@@ -18,12 +18,12 @@ const userContextKey = contextKey("user")
 // NOTE: userContextKey as the key
 func (app *application) contextSetUser(r *http.Request, user *data.User) *http.Request {
 
-	ctx	 := context.WithValue(r.Context(), userContextKey, user)
+	ctx := context.WithValue(r.Context(), userContextKey, user)
 	return r.WithContext(ctx)
 }
 
 // contxtGetUser retrieves the User struct from the request context.
-// The only time that we'll use this is when we logically expect there to be User struct 
+// The only time that we'll use this is when we logically expect there to be User struct
 // value in the context. If it doesn't exist, it will be an "unexecpeted error"
 func (app *application) contextGetUser(r *http.Request) *data.User {
 	user, ok := r.Context().Value(userContextKey).(*data.User)
@@ -32,4 +32,3 @@ func (app *application) contextGetUser(r *http.Request) *data.User {
 	}
 	return user
 }
-

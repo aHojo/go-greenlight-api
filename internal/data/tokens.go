@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base32"
-	"math/rand"
+	"crypto/rand"
 	"time"
 
 	"github.com/ahojo/greenlight/internal/validator"
@@ -13,18 +13,18 @@ import (
 
 // Define constants for the token scope
 const (
-	ScopeActivation = "activation"
+	ScopeActivation     = "activation"
 	ScopeAuthentication = "authentication"
 )
 
 // Token hold the data for a token
 // Includes the plaintext and hashed versions of the token
 type Token struct {
-	Plaintext string `json:"token"`
-	Hash      []byte `json:"-"`
-	UserID    int64 `json:"-"`
+	Plaintext string    `json:"token"`
+	Hash      []byte    `json:"-"`
+	UserID    int64     `json:"-"`
 	Expiry    time.Time `json:"expiry"`
-	Scope     string `json:"-"`
+	Scope     string    `json:"-"`
 }
 
 func generateToken(UserID int64, ttl time.Duration, scope string) (*Token, error) {
@@ -84,10 +84,9 @@ type TokenModel struct {
 	DB *sql.DB
 }
 
-
 // New() shortcut to create a new Token struct and insert the data into the database
-func (m TokenModel) New(userID int64, ttl time.Duration, scope string)(*Token, error) {
-	
+func (m TokenModel) New(userID int64, ttl time.Duration, scope string) (*Token, error) {
+
 	token, err := generateToken(userID, ttl, scope)
 	if err != nil {
 		return nil, err
@@ -97,87 +96,30 @@ func (m TokenModel) New(userID int64, ttl time.Duration, scope string)(*Token, e
 	return token, err
 }
 
-
 // Insert adds the data for a specific token to the tokens table
 func (m TokenModel) Insert(token *Token) error {
 	query := `
 	INSERT INTO tokens (hash, user_id, expiry, scope)
 	VALUES ($1, $2, $3, $4);
 	`
-
 	args := []interface{}{token.Hash, token.UserID, token.Expiry, token.Scope}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	_, err := m.DB.ExecContext(ctx, query, args...)
 	return err
 }
 
-
 // DeleteAllForUser deletes all tokens for a specific user and scope
 func (m TokenModel) DeleteAllForUser(scope string, userID int64) error {
 
-	query :=`
+	query := `
 		DELETE FROM tokens
 		WHERE scope = $1 AND user_id = $2;
 	`
-	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	_, err := m.DB.ExecContext(ctx, query, scope, userID)
 	return err
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

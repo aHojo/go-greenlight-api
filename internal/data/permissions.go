@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // Define a permissions slice, which will be used to hold the permission codes
@@ -33,8 +35,7 @@ func (m PermissionModel) GetAllForUser(userID int64) (Permissions, error) {
 	INNER JOIN users ON users_permissions.user_id = users.id
 	WHERE users.id = $1`
 
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	rows, err := m.DB.QueryContext(ctx, query, userID)
@@ -61,4 +62,25 @@ func (m PermissionModel) GetAllForUser(userID int64) (Permissions, error) {
 	}
 
 	return permissions, nil
+}
+
+// Add the provided permission codes for a specific user. Notice that we're using a
+// variadic parameter for the codes so that we can assign multiple permissions in a
+// single call.
+func (m PermissionModel) AddForUser(userID int64, codes ...string) error {
+	// 	In this query the $1 parameter will be the user’s ID, and the $2 parameter will be a
+	// PostgreSQL array of the permission codes that we want to add for the user, like
+	// {'movies:read', 'movies:write'} .
+	// So what’s happening here is that the SELECT ... statement on the second line creates an
+	// ‘interim’ table with rows made up of the user ID and the corresponding IDsfor the permission
+	// codesin the array. Then we insert the contents of this interim table into our
+	// user_permissions table.
+	query := `
+	INSERT INTO users_permissions
+	SELECT $1, permissions.id FROM permissions WHERE permissions.code = ANY($2)`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_, err := m.DB.ExecContext(ctx, query, userID, pq.Array(codes))
+	return err
 }
