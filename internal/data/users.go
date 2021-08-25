@@ -15,6 +15,9 @@ var (
 	ErrDuplicateEmail = errors.New("duplicate email")
 )
 
+/* OUR ANONYMOUS USER */
+var AnonymousUser = &User{}
+
 // User represents a single user.
 // we are omitting passord and version from the response
 // we are using a custom password type.
@@ -35,6 +38,16 @@ type password struct {
 	hash      []byte
 }
 
+// Check if the user is an anonymous user
+func (u *User) IsAnonymous() bool {
+	return u == AnonymousUser
+
+	/* 
+		data.AnonymousUser.IsAnonymous() // → Returns true
+		otherUser := &data.User{}
+		otherUser.IsAnonymous() // → Returns false
+	*/
+}
 // Set() calculates the bcrypt hash of a plaintext password, stores the hash and plaintext versions in the struct
 func (p *password) Set(plaintextPassword string) error {
 
@@ -238,3 +251,4 @@ func (m UserModel) GetForToken(tokenScope, tokenPlaintext string) (*User, error)
 	// Return the user
 	return &user, nil
 }
+

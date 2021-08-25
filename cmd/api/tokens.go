@@ -1,0 +1,78 @@
+package main
+
+import (
+	"errors"
+	"net/http"
+	"time"
+
+	"github.com/ahojo/greenlight/internal/data"
+	"github.com/ahojo/greenlight/internal/validator"
+)
+
+func (app *application) createAuthenticationTokenHandler(w http.ResponseWriter, r *http.Request) {
+
+	// Parse the email and password from the request body
+	var input struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	err := app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	// Validate the new email
+	v := validator.New()
+
+	data.ValidateEmail(v, input.Email)
+	data.ValidatePassword(v, input.Password)
+
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// Lookup the user record based on the email address.
+	// If no matching user found, send an invalid respose
+	// to send a 401 unauthorized
+	user, err := app.models.Users.GetByEmail(input.Email)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.invalidCredentialResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	// Check if the provided password matches the actual password for the user
+	match, err := user.Password.Matches(input.Password)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	if !match {
+		app.invalidCredentialResponse(w, r)
+		return
+	}
+
+	// If the passwords match, generate a new 24 hour token
+	token, err := app.models.Token.New(user.ID, 24*time.Hour, data.ScopeAuthentication)
+	if err != nil {
+		app.serverErrorResponse(w,r,err)
+		return
+	}
+
+	// Sometimes the token is sent in an Authorization header, but this is a violation of the HTTP specification
+	// Authorization is a request header and not a response one. 
+	// Encode the token to JSON and send it in the response along with a 201 created. 
+	err = app.writeJSON(w,http.StatusCreated, envelope{"authentication_token": token}, nil)
+	if err != nil {
+		app.serverErrorResponse(w,r,err)
+	}
+}
