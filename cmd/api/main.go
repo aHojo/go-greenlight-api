@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"flag"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,6 +45,11 @@ type config struct {
 		password string
 		sender   string
 	}
+	// cors struct to hold our trusted origins
+cors struct {
+	trustedOrigins []string
+}
+
 }
 
 // Holds the dependencies for our http handlers, helpers,
@@ -57,6 +63,7 @@ type application struct {
 	// Don't need to initialize it before use because it's zeroed out.
 	wg sync.WaitGroup
 }
+
 
 func main() {
 	var cfg config
@@ -85,6 +92,14 @@ func main() {
 	flag.StringVar(&cfg.smtp.username, "smtp-username", "9dcbdd57b7a1c2", "SMTP username")
 	flag.StringVar(&cfg.smtp.password, "smtp-password", "8698b43271febb", "SMTP password")
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "Greenlight <no-reply@greenlight.alexedwards.net>", "SMTP sender")
+
+	// flag.Func() to process the -cors-trusted-origins command line flag
+	// Will use strings.Fields() to split the flag value into a slice based on whitespace
+	// If no flags are present, then strings.Fields will return an empty slice
+	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated) ", func(val string) error{
+		cfg.cors.trustedOrigins = strings.Fields(val)
+		return nil
+	})
 	flag.Parse()
 
 	// Initialize a new logger which writes messages to the standard stream, prefixed
