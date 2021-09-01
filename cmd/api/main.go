@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"expvar"
 	"flag"
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -21,6 +22,10 @@ import (
 
 // The version of our api
 const version = "1.0.0"
+
+// Create a buildTime variable to hold the executable binary build time. Note that this
+// must be a string type, as the -X linker flag will only work with string variables.
+var buildTime string 
 
 // All the config settings for our application
 type config struct {
@@ -100,7 +105,15 @@ func main() {
 		cfg.cors.trustedOrigins = strings.Fields(val)
 		return nil
 	})
+
+	displayVersion := flag.Bool("version", false, "Display version and exit")
+
 	flag.Parse()
+	if *displayVersion {
+		fmt.Printf("Version:\t%s\n", version)
+		fmt.Printf("Build Time:\t%s\n", buildTime)
+		os.Exit(0)
+	}
 
 	// Initialize a new logger which writes messages to the standard stream, prefixed
 	// with the current date and time

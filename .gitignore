@@ -2,3 +2,4 @@
 dbdata
 database.env
 .envrc
+bin/
