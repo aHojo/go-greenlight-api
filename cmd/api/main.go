@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
 	"flag"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -46,10 +48,9 @@ type config struct {
 		sender   string
 	}
 	// cors struct to hold our trusted origins
-cors struct {
-	trustedOrigins []string
-}
-
+	cors struct {
+		trustedOrigins []string
+	}
 }
 
 // Holds the dependencies for our http handlers, helpers,
@@ -63,7 +64,6 @@ type application struct {
 	// Don't need to initialize it before use because it's zeroed out.
 	wg sync.WaitGroup
 }
-
 
 func main() {
 	var cfg config
@@ -96,7 +96,7 @@ func main() {
 	// flag.Func() to process the -cors-trusted-origins command line flag
 	// Will use strings.Fields() to split the flag value into a slice based on whitespace
 	// If no flags are present, then strings.Fields will return an empty slice
-	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated) ", func(val string) error{
+	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated) ", func(val string) error {
 		cfg.cors.trustedOrigins = strings.Fields(val)
 		return nil
 	})
@@ -114,6 +114,22 @@ func main() {
 	}
 	defer db.Close()
 	logger.PrintInfo("Database connection pool established", nil)
+
+	// Publish a new "version" variable in the expvar handler containing our application version number
+	expvar.NewString("version").Set(version)
+
+	// Publish the number of active goroutines.
+	expvar.Publish("goroutines", expvar.Func(func() interface{} {
+		return runtime.NumGoroutine()
+	}))
+	// Publish the database connection pool statistics.
+	expvar.Publish("database", expvar.Func(func() interface{} {
+		return db.Stats()
+	}))
+	// Publish the current Unix timestamp.
+	expvar.Publish("timestamp", expvar.Func(func() interface{} {
+		return time.Now().Unix()
+	}))
 
 	// Initialize our application
 	app := &application{
