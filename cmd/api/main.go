@@ -20,12 +20,14 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// The version of our api
-const version = "1.0.0"
+
 
 // Create a buildTime variable to hold the executable binary build time. Note that this
 // must be a string type, as the -X linker flag will only work with string variables.
-var buildTime string 
+var (
+	version string
+	buildTime string
+	) 
 
 // All the config settings for our application
 type config struct {
