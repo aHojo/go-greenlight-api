@@ -73,7 +73,7 @@ func main() {
 	flag.StringVar(&cfg.env, "env", "dev", "The environment our code was built with.")
 
 	// DB CLI flags
-	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("GREENLIGHT_DB_DSN"), "PostgresSQL DSN")
+	flag.StringVar(&cfg.db.dsn, "db-dsn", "", "PostgresSQL DSN")
 	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgresSQL max open connections")
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idleconns", 25, "PostgresSQL max idle connections")
 	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", "15m", "PostgresSQL max connection idle time")
