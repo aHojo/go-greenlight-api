@@ -93,8 +93,7 @@ total 0
 ## Creating the Users Tabel  
 
 ```sql
- migrate create -se
-q -ext=.sql -dir=./migrations create_users_table
+ migrate create -seq -ext=.sql -dir=./migrations create_users_table
 /home/ahojo/development/go/src/go-greenlight-api/migrations/000004_create_users_table.up.sql
 /home/ahojo/development/go/src/go-greenlight-api/migrations/000004_create_users_table.down.sql
 ```
